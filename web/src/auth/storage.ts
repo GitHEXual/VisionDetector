@@ -74,6 +74,7 @@ export async function registerAccount(name: string, login: string, password: str
 }
 
 export async function loginAccount(login: string, password: string) {
+  await ensureDemoAccount();
   const users = readUsers();
   const normalized = login.trim().toLowerCase();
   const account = users.find((user) => user.login === normalized);
@@ -83,4 +84,24 @@ export async function loginAccount(login: string, password: string) {
   const session = { name: account.name, login: account.login };
   writeSession(session);
   return session;
+}
+
+export async function ensureDemoAccount() {
+  const users = readUsers();
+  const demoLogin = "test";
+  const demoHash = await hashPassword("test");
+  const existing = users.find((user) => user.login === demoLogin);
+  if (existing) {
+    if (existing.passwordHash !== demoHash || existing.name !== "Test") {
+      writeUsers(
+        users.map((user) =>
+          user.login === demoLogin
+            ? { name: "Test", login: demoLogin, passwordHash: demoHash }
+            : user,
+        ),
+      );
+    }
+    return;
+  }
+  writeUsers([...users, { name: "Test", login: demoLogin, passwordHash: demoHash }]);
 }

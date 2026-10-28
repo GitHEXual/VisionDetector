@@ -48,6 +48,8 @@ function cursorMode(el: Element | null): CursorMode {
 }
 
 export function SiteCursor() {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const homeRef = useRef<HTMLElement | null>(null);
   const dotRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
   const arrowRef = useRef<HTMLDivElement>(null);
@@ -57,11 +59,13 @@ export function SiteCursor() {
     if (!fine.matches) return;
 
     const root = document.documentElement;
+    const host = hostRef.current;
     const dot = dotRef.current;
     const ring = ringRef.current;
     const arrow = arrowRef.current;
-    if (!dot || !ring || !arrow) return;
+    if (!host || !dot || !ring || !arrow) return;
 
+    homeRef.current = host.parentElement;
     let mx = window.innerWidth / 2;
     let my = window.innerHeight / 2;
     let rx = mx;
@@ -71,6 +75,16 @@ export function SiteCursor() {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const follow = reduce ? 1 : 0.18;
     const maxLag = 18;
+
+    const syncHost = () => {
+      const fs = document.fullscreenElement;
+      const home = homeRef.current;
+      if (fs instanceof HTMLElement) {
+        if (host.parentElement !== fs) fs.appendChild(host);
+      } else if (home && host.parentElement !== home) {
+        home.appendChild(host);
+      }
+    };
 
     const paint = () => {
       rx += (mx - rx) * follow;
@@ -105,27 +119,32 @@ export function SiteCursor() {
     const onLeave = () => setMode("off");
 
     root.dataset.appCursor = "off";
+    syncHost();
     window.addEventListener("pointermove", onMove, { passive: true });
     document.addEventListener("pointerleave", onLeave);
+    document.addEventListener("fullscreenchange", syncHost);
     raf = requestAnimationFrame(paint);
 
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerleave", onLeave);
+      document.removeEventListener("fullscreenchange", syncHost);
       delete root.dataset.appCursor;
+      const home = homeRef.current;
+      if (home && host.parentElement !== home) home.appendChild(host);
     };
   }, []);
 
   return (
-    <>
-      <div ref={ringRef} className="siteCursor siteCursorRing" aria-hidden />
-      <div ref={dotRef} className="siteCursor siteCursorDot" aria-hidden />
-      <div ref={arrowRef} className="siteCursor siteCursorArrow" aria-hidden>
+    <div ref={hostRef} className="siteCursorHost" aria-hidden>
+      <div ref={ringRef} className="siteCursor siteCursorRing" />
+      <div ref={dotRef} className="siteCursor siteCursorDot" />
+      <div ref={arrowRef} className="siteCursor siteCursorArrow">
         <svg viewBox="0 0 24 24" fill="#faf6eb" stroke="rgba(42, 35, 24, 0.72)" strokeWidth="1.15" strokeLinejoin="round">
           <path d="M3.688 3.037a.497.497 0 0 0-.651.651l6.5 15.999a.501.501 0 0 0 .947-.062l1.569-6.083a2 2 0 0 1 1.448-1.479l6.124-1.579a.5.5 0 0 0 .063-.947z" />
         </svg>
       </div>
-    </>
+    </div>
   );
 }

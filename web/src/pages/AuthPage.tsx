@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { loginAccount, readSession, registerAccount } from "../auth/storage";
+import { ensureDemoAccount, loginAccount, readSession, registerAccount } from "../auth/storage";
 import { EyeLogo } from "../components/EyeLogo";
 import "./auth.css";
 
@@ -24,6 +24,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
     setPassword("");
     setConfirm("");
     setError("");
+    void ensureDemoAccount();
   }, [mode]);
 
   if (session) return <Navigate to="/" replace />;
@@ -36,8 +37,8 @@ export function AuthPage({ mode }: { mode: Mode }) {
       setError("Логин: 3–32 символа, латиница, цифры, . _ -");
       return;
     }
-    if (password.length < 6) {
-      setError("Пароль должен быть не короче 6 символов");
+    if (password.length < 4) {
+      setError("Пароль должен быть не короче 4 символов");
       return;
     }
     if (mode === "register") {
@@ -135,7 +136,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 autoComplete={mode === "login" ? "current-password" : "new-password"}
-                placeholder="Не короче 6 символов"
+                placeholder="Не короче 4 символов"
               />
             </label>
             {mode === "register" && (

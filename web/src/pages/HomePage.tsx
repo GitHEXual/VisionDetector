@@ -345,7 +345,10 @@ function CameraTile({ camera }: { camera: Camera }) {
             {camera.code} · {camera.location}
           </div>
         </div>
-        <span className={statusClass(camera.status)}>{statusLabel[camera.status]}</span>
+        <span className={`cameraTileStatus cameraTileStatus--${camera.status}`}>
+          <i aria-hidden />
+          {statusLabel[camera.status]}
+        </span>
       </footer>
     </article>
   );
@@ -378,10 +381,13 @@ export function HomePage() {
   const stripPanRef = useRef<StripPanState | null>(null);
   const rangeRef = useRef({ start: 0.82, end: 0.9 });
   const layoutBeforeCameraFs = useRef("3x3");
+  const pageBeforeCameraFs = useRef(0);
+  const restoringFromCameraFs = useRef(false);
   const cameraFullscreen = useRef(false);
   const [rangeStartDraft, setRangeStartDraft] = useState(() => formatTimelineStamp(0.82));
   const [rangeEndDraft, setRangeEndDraft] = useState(() => formatTimelineStamp(0.9));
   const [stripPanning, setStripPanning] = useState(false);
+  const [scrubbing, setScrubbing] = useState(false);
 
   const timelineViewSpan = 1 / timelineZoom;
   const timelineMarksList = useMemo(
@@ -449,11 +455,15 @@ export function HomePage() {
   }, [selectedAssetId, query]);
 
   useEffect(() => {
-    if (cameraFullscreen.current) return;
+    if (cameraFullscreen.current || restoringFromCameraFs.current) return;
     setPage(0);
   }, [layoutId]);
 
   useEffect(() => {
+    if (restoringFromCameraFs.current) {
+      restoringFromCameraFs.current = false;
+      return;
+    }
     if (page !== safePage) setPage(safePage);
   }, [page, safePage]);
 
@@ -467,7 +477,9 @@ export function HomePage() {
       setIsFullscreen(active);
       if (!active && cameraFullscreen.current) {
         cameraFullscreen.current = false;
+        restoringFromCameraFs.current = true;
         setLayoutId(layoutBeforeCameraFs.current);
+        setPage(pageBeforeCameraFs.current);
       }
     };
     document.addEventListener("fullscreenchange", onFullscreenChange);
@@ -519,6 +531,7 @@ export function HomePage() {
   const openCameraFullscreen = (cameraId: string) => {
     setSelectedCameraId(cameraId);
     const cameraIndex = filteredCameras.findIndex((camera) => camera.id === cameraId);
+    pageBeforeCameraFs.current = page;
     if (layoutId !== "1") {
       layoutBeforeCameraFs.current = layoutId;
       setLayoutId("1");
@@ -577,10 +590,10 @@ export function HomePage() {
     const { zoom, start } = timelineViewRef.current;
     const span = 1 / zoom;
     if (isLive) {
-      // Keep the live edge near the right side of the viewport.
+      // Keep the live edge at the right end of the viewport.
       const livePos = (1 - start) / span;
-      if (livePos < 0.55 || livePos > 0.95) {
-        setTimelineViewStart(clampViewStart(1 - span * 0.82, span));
+      if (livePos < 0.97 || livePos > 1.02) {
+        setTimelineViewStart(clampViewStart(1 - span, span));
       }
       return;
     }
@@ -695,10 +708,12 @@ export function HomePage() {
       const b = next;
       const start = Math.min(a, b);
       const end = Math.max(a, b);
-      if (end - start < TIMELINE_RANGE_MIN) {
-        setFragmentRange(clamp(a, 0, 1 - TIMELINE_RANGE_MIN), clamp(a, 0, 1 - TIMELINE_RANGE_MIN) + TIMELINE_RANGE_MIN, {
-          seekStart: true,
-        });
+      const viewSpan = 1 / timelineViewRef.current.zoom;
+      // Wide enough default on click so both handles are easy to grab.
+      const defaultSpan = clamp(viewSpan * 0.22, viewSpan * 0.14, Math.min(viewSpan * 0.4, 0.3));
+      if (!drag.moved || end - start < defaultSpan * 0.45) {
+        const nextStart = clamp(a - defaultSpan * 0.35, 0, 1 - defaultSpan);
+        setFragmentRange(nextStart, nextStart + defaultSpan, { seekStart: true });
         return;
       }
       setFragmentRange(start, end, { seekStart: true });
@@ -727,6 +742,7 @@ export function HomePage() {
       originEnd: end,
       moved: false,
     };
+    setScrubbing(mode === "scrub");
     event.currentTarget.setPointerCapture(event.pointerId);
     applyTimelineDrag(event.clientX, event.altKey);
   };
@@ -745,6 +761,7 @@ export function HomePage() {
     }
     if (drag && event.altKey) applyTimelineDrag(event.clientX, true);
     timelineDragRef.current = null;
+    setScrubbing(false);
     setRangeStartDraft(formatTimelineStamp(rangeRef.current.start));
     setRangeEndDraft(formatTimelineStamp(rangeRef.current.end));
   };
@@ -816,20 +833,22 @@ export function HomePage() {
       setIsPlaying(false);
       return;
     }
-    const { start } = rangeRef.current;
+    const { start, end } = rangeRef.current;
     setIsLive(false);
-    setProgress(start);
+    // Resume from the current playhead; restart only at the end or outside the fragment.
+    setProgress((value) => {
+      if (value < start || value >= end - 1e-6) return start;
+      return clamp(value, start, end);
+    });
     setIsPlaying(true);
-    const span = 1 / timelineViewRef.current.zoom;
-    setTimelineViewStart(clampViewStart(start - span * 0.15, span));
   };
 
   const goLive = () => {
     setIsPlaying(false);
     setIsLive(true);
     setProgress(1);
-    // Jump viewport so "now" sits near the right edge of the timeline.
-    focusTimelineOn(1, 0.82);
+    // Jump viewport so "now" sits at the right edge of the timeline.
+    focusTimelineOn(1, 1);
   };
 
   const downloadFragment = () => {
@@ -881,20 +900,42 @@ export function HomePage() {
           </div>
         </div>
         <div className="dashChromeRight">
-          <div className="dashUser">
-            <span>{session.name}</span>
-            <span className="dashUserLogin">{session.login}</span>
+          <div className="dashAccount">
+            <div className="dashAccountAvatar" aria-hidden>
+              {(session.name.trim().slice(0, 1) || session.login.slice(0, 1) || "?").toUpperCase()}
+            </div>
+            <div className="dashAccountMeta">
+              <span className="dashAccountName">{session.name}</span>
+              <span className="dashAccountLogin">@{session.login}</span>
+            </div>
+            <button
+              className="dashLogout"
+              type="button"
+              onClick={() => {
+                writeSession(null);
+                window.location.assign("/login");
+              }}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden>
+                <path
+                  d="M10 5H6.8C5.8 5 5 5.8 5 6.8v10.4C5 18.2 5.8 19 6.8 19H10"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M10 12h9m0 0-3.2-3.2M19 12l-3.2 3.2"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Выйти
+            </button>
           </div>
-          <button
-            className="dashGhost"
-            type="button"
-            onClick={() => {
-              writeSession(null);
-              window.location.assign("/login");
-            }}
-          >
-            Выйти
-          </button>
         </div>
       </header>
 
@@ -909,20 +950,17 @@ export function HomePage() {
           </div>
 
           <div className="dashSideSummary">
-            <div>
-              <span className="dashStatus dashStatus--online" />
-              <strong>{onlineCount}</strong>
-              <em>online</em>
+            <div className="dashSideStat dashSideStat--online">
+              <span className="dashSideStatLabel">online</span>
+              <strong className="dashSideStatValue">{onlineCount}</strong>
             </div>
-            <div>
-              <span className="dashStatus dashStatus--alarm" />
-              <strong>{alarmCount}</strong>
-              <em>alarm</em>
+            <div className="dashSideStat dashSideStat--alarm">
+              <span className="dashSideStatLabel">alarm</span>
+              <strong className="dashSideStatValue">{alarmCount}</strong>
             </div>
-            <div>
-              <span className="dashStatus dashStatus--offline" />
-              <strong>{offlineCount}</strong>
-              <em>off</em>
+            <div className="dashSideStat dashSideStat--offline">
+              <span className="dashSideStatLabel">off</span>
+              <strong className="dashSideStatValue">{offlineCount}</strong>
             </div>
           </div>
 
@@ -1139,7 +1177,8 @@ export function HomePage() {
           <div
             className="cameraGrid"
             style={{
-              gridTemplateColumns: `repeat(${layout.cols}, minmax(0, 1fr))`,
+              // Cap column width by row height (~5:4) so tiles are less landscape while still filling height.
+              gridTemplateColumns: `repeat(${layout.cols}, minmax(0, calc((100cqh - ${(layout.rows - 1)} * var(--camera-gap)) / ${layout.rows} * 1.22)))`,
               gridTemplateRows: `repeat(${layout.rows}, minmax(0, 1fr))`,
             }}
           >
@@ -1335,11 +1374,15 @@ export function HomePage() {
               {thumbInView >= -0.02 && thumbInView <= 1.02 ? (
                 <button
                   type="button"
-                  className={`dashTimelineThumb${isLive ? " is-live" : ""}`}
+                  className={`dashTimelineThumb${isLive ? " is-live" : ""}${scrubbing ? " is-scrubbing" : ""}`}
                   style={{ left: `${clamp(thumbInView, 0, 1) * 100}%` }}
                   data-timeline-handle={isLive ? undefined : "scrub"}
                   aria-label={isLive ? "Текущий момент Live" : "Ползунок воспроизведения"}
-                />
+                >
+                  <span className="dashTimelineHandleLabel dashTimelineThumbLabel">
+                    {formatTimelineStamp(playhead, false)}
+                  </span>
+                </button>
               ) : null}
               <div className="dashTimelineMarks" aria-hidden>
                 {timelineMarksList.map((mark) => (

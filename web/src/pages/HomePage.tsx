@@ -1,15 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Navigate } from "react-router-dom";
-import { readSession, writeSession } from "../auth/storage";
-import { EyeLogo } from "../components/EyeLogo";
-import {
-  assets,
-  cameraById,
-  cameras,
-  statusLabel,
-  type Camera,
-  type CameraStatus,
-} from "../data/assets";
+import { readSession } from "../auth/storage";
+import { DashChrome } from "../components/DashChrome";
+import { statusLabel, type Camera, type CameraStatus } from "../data/assets";
+import { cameraById, useAssets, useCameras } from "../data/cameraStore";
 import "./dashboard.css";
 
 const PLAYBACK_SPEEDS = [0.5, 1, 2, 4] as const;
@@ -356,9 +350,11 @@ function CameraTile({ camera }: { camera: Camera }) {
 
 export function HomePage() {
   const session = readSession();
+  const cameras = useCameras();
+  const assets = useAssets();
   const mainRef = useRef<HTMLElement>(null);
-  const [selectedAssetId, setSelectedAssetId] = useState(assets[0].id);
-  const [expandedAssetId, setExpandedAssetId] = useState<string | null>(assets[0].id);
+  const [selectedAssetId, setSelectedAssetId] = useState(assets[0]?.id ?? "asset-all");
+  const [expandedAssetId, setExpandedAssetId] = useState<string | null>(assets[0]?.id ?? "asset-all");
   const [query, setQuery] = useState("");
   const [layoutId, setLayoutId] = useState("3x3");
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
@@ -891,53 +887,7 @@ export function HomePage() {
 
   return (
     <main className="dash">
-      <header className="dashChrome">
-        <div className="dashBrand">
-          <EyeLogo to="/" size="sm" />
-          <div className="dashBrandMeta">
-            <div className="dashKicker">Мониторинг</div>
-            <div className="dashTitle">Все камеры</div>
-          </div>
-        </div>
-        <div className="dashChromeRight">
-          <div className="dashAccount">
-            <div className="dashAccountAvatar" aria-hidden>
-              {(session.name.trim().slice(0, 1) || session.login.slice(0, 1) || "?").toUpperCase()}
-            </div>
-            <div className="dashAccountMeta">
-              <span className="dashAccountName">{session.name}</span>
-              <span className="dashAccountLogin">@{session.login}</span>
-            </div>
-            <button
-              className="dashLogout"
-              type="button"
-              onClick={() => {
-                writeSession(null);
-                window.location.assign("/login");
-              }}
-            >
-              <svg viewBox="0 0 24 24" aria-hidden>
-                <path
-                  d="M10 5H6.8C5.8 5 5 5.8 5 6.8v10.4C5 18.2 5.8 19 6.8 19H10"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M10 12h9m0 0-3.2-3.2M19 12l-3.2 3.2"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Выйти
-            </button>
-          </div>
-        </div>
-      </header>
+      <DashChrome session={session} kicker="Мониторинг" title="Все камеры" />
 
       <section className="dashBody">
         <aside className="dashSidebar">

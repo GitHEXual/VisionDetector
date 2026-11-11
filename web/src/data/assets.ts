@@ -6,6 +6,8 @@ export type Camera = {
   code: string;
   status: CameraStatus;
   location: string;
+  stream?: string;
+  enabled?: boolean;
 };
 
 export type Asset = {

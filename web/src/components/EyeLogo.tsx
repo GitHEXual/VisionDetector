@@ -4,12 +4,13 @@ import "./EyeLogo.css";
 
 const PALETTE = "   ...:::---+++***◦◦••▢▣";
 const CELL = 14;
-const COLS = 34;
-const ROWS = 15;
+const COLS = 26;
+const ROWS = 16;
 
 type EyeLogoProps = {
   to?: string;
   label?: string;
+  size?: "md" | "sm";
 };
 
 function field(c: number, r: number, t: number) {
@@ -33,7 +34,7 @@ function put(
   ctx.fillText(ch, c * CELL, r * CELL);
 }
 
-export function EyeLogo({ to = "/", label = "Око" }: EyeLogoProps) {
+export function EyeLogo({ to = "/", label = "Око", size = "md" }: EyeLogoProps) {
   const rootRef = useRef<HTMLAnchorElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -93,14 +94,14 @@ export function EyeLogo({ to = "/", label = "Око" }: EyeLogoProps) {
 
       for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
-          const nx = (c - midC) / (COLS / 2.05);
-          const ny = (r - midR) / (ROWS / 2.35);
-          const eye = (nx * nx) / 1.02 + (ny * ny) / 0.42;
-          if (eye > 1.18) continue;
+          const nx = (c - midC) / (COLS / 2.1);
+          const ny = (r - midR) / (ROWS / 2.15);
+          const eye = (nx * nx) / 0.92 + (ny * ny) / 0.62;
+          if (eye > 1.16) continue;
 
           // upper / lower lid arcs
-          const lidTop = eye > 0.86 && eye <= 1.08 && ny < -0.08;
-          const lidBot = eye > 0.86 && eye <= 1.08 && ny > 0.12;
+          const lidTop = eye > 0.84 && eye <= 1.06 && ny < -0.1;
+          const lidBot = eye > 0.84 && eye <= 1.06 && ny > 0.14;
           if (lidTop) {
             put(ctx, ny < -0.55 ? "`" : "-", c, r, "rgba(250,246,235,0.78)");
             continue;
@@ -134,28 +135,28 @@ export function EyeLogo({ to = "/", label = "Око" }: EyeLogoProps) {
           const px = c - (midC + lx);
           const py = r - (midR + ly);
           const pupil = Math.hypot(px, py);
-          const iris = Math.hypot(px * 0.95, py * 1.08);
+          const iris = Math.hypot(px * 0.98, py * 1.02);
 
           // pupil core
-          if (pupil < 1.05) {
+          if (pupil < 1.15) {
             put(ctx, "▣", c, r, "#ff6b35");
             continue;
           }
           // pupil rim
-          if (pupil < 1.55) {
+          if (pupil < 1.7) {
             put(ctx, "▢", c, r, "rgba(255,107,53,0.9)");
             continue;
           }
           // iris rings
-          if (iris < 2.2) {
+          if (iris < 2.45) {
             put(ctx, "◦", c, r, "rgba(255,176,138,0.95)");
             continue;
           }
-          if (iris < 3.05) {
+          if (iris < 3.2) {
             put(ctx, "*", c, r, "rgba(255,107,53,0.72)");
             continue;
           }
-          if (iris < 3.7) {
+          if (iris < 3.85) {
             put(ctx, "+", c, r, "rgba(255,107,53,0.45)");
             continue;
           }
@@ -202,7 +203,12 @@ export function EyeLogo({ to = "/", label = "Око" }: EyeLogoProps) {
   }, []);
 
   return (
-    <Link ref={rootRef} to={to} className="eyeLogo" aria-label={label}>
+    <Link
+      ref={rootRef}
+      to={to}
+      className={`eyeLogo${size === "sm" ? " eyeLogo--sm" : ""}`}
+      aria-label={label}
+    >
       <canvas ref={canvasRef} className="eyeLogoMark" />
     </Link>
   );

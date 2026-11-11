@@ -9,9 +9,13 @@
 
 .eyeLogoMark {
   display: block;
-  width: min(460px, 78vw);
+  width: min(360px, 70vw);
   height: auto;
-  aspect-ratio: 34 / 15;
+  aspect-ratio: 26 / 16;
+}
+
+.eyeLogo--sm .eyeLogoMark {
+  width: min(132px, 28vw);
 }
 
 .eyeLogo:focus-visible {

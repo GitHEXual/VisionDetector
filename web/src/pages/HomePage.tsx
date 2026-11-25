@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { readSession } from "../auth/storage";
 import { DashChrome } from "../components/DashChrome";
 import { statusLabel, type Camera, type CameraStatus } from "../data/assets";
-import { cameraById, useAssets, useCameras } from "../data/cameraStore";
+import { addAsset, cameraById, useAssets, useCameras } from "../data/cameraStore";
 import "./dashboard.css";
 
 const PLAYBACK_SPEEDS = [0.5, 1, 2, 4] as const;
@@ -355,6 +355,9 @@ export function HomePage() {
   const mainRef = useRef<HTMLElement>(null);
   const [selectedAssetId, setSelectedAssetId] = useState(assets[0]?.id ?? "asset-all");
   const [expandedAssetId, setExpandedAssetId] = useState<string | null>(assets[0]?.id ?? "asset-all");
+  const [addingAsset, setAddingAsset] = useState(false);
+  const [assetDraftName, setAssetDraftName] = useState("");
+  const [assetDraftError, setAssetDraftError] = useState("");
   const [query, setQuery] = useState("");
   const [layoutId, setLayoutId] = useState("3x3");
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
@@ -945,7 +948,12 @@ export function HomePage() {
                       </span>
                     </span>
                     <span className="assetItemEnd">
-                      {alarms > 0 && <span className="assetAlarm">{alarms}</span>}
+                      {alarms > 0 && (
+                        <span className="assetAlarm" title={`Alarm: ${alarms}`}>
+                          <i aria-hidden />
+                          <em>{String(alarms).padStart(2, "0")}</em>
+                        </span>
+                      )}
                       <span className={`assetChevron${expanded ? " is-open" : ""}`} aria-hidden />
                     </span>
                   </button>
@@ -979,6 +987,67 @@ export function HomePage() {
               );
             })}
           </ul>
+
+          <div className="assetAdd">
+            {addingAsset ? (
+              <form
+                className="assetAddForm"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setAssetDraftError("");
+                  try {
+                    const asset = addAsset({ name: assetDraftName, kind: "zone" });
+                    setAssetDraftName("");
+                    setAddingAsset(false);
+                    setSelectedAssetId(asset.id);
+                    setExpandedAssetId(asset.id);
+                    setSelectedCameraId(null);
+                  } catch (err) {
+                    setAssetDraftError(err instanceof Error ? err.message : "Не удалось добавить актив");
+                  }
+                }}
+              >
+                <input
+                  className="assetAddInput"
+                  value={assetDraftName}
+                  onChange={(event) => setAssetDraftName(event.target.value)}
+                  placeholder="Название актива"
+                  autoFocus
+                  spellCheck={false}
+                />
+                {assetDraftError ? <div className="assetAddError">{assetDraftError}</div> : null}
+                <div className="assetAddActions">
+                  <button
+                    type="button"
+                    className="assetAddCancel"
+                    onClick={() => {
+                      setAddingAsset(false);
+                      setAssetDraftName("");
+                      setAssetDraftError("");
+                    }}
+                  >
+                    Отмена
+                  </button>
+                  <button type="submit" className="assetAddSubmit">
+                    Добавить
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                type="button"
+                className="assetAddBtn"
+                aria-label="Добавить актив"
+                onClick={() => {
+                  setAddingAsset(true);
+                  setAssetDraftError("");
+                }}
+              >
+                <span aria-hidden>+</span>
+                Добавить актив
+              </button>
+            )}
+          </div>
         </aside>
 
         <section

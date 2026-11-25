@@ -118,3 +118,29 @@ export function setCameraEnabled(id: string, enabled: boolean) {
 export function isCameraEnabled(camera: Camera) {
   return camera.enabled !== false;
 }
+
+type AssetDraft = {
+  name: string;
+  kind?: Asset["kind"];
+};
+
+export function addAsset(draft: AssetDraft) {
+  const name = draft.name.trim();
+  const kind = draft.kind ?? "zone";
+
+  if (name.length < 2) throw new Error("Укажите название актива");
+  if (assetsState.some((asset) => asset.name.toLowerCase() === name.toLowerCase())) {
+    throw new Error("Актив с таким названием уже есть");
+  }
+
+  const asset: Asset = {
+    id: `asset-${Date.now().toString(36)}`,
+    name,
+    kind,
+    cameraIds: [],
+  };
+
+  assetsState = [...assetsState, asset];
+  emit();
+  return asset;
+}
